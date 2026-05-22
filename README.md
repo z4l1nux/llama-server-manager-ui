@@ -22,6 +22,9 @@ Llama Server Manager is a complete Python-based graphical user interface (GUI) d
   sudo apt-get install python3-tk
   ```
 
+#### macOS
+- **Python 3.x**: Usually pre-installed or can be installed via Homebrew (`brew install python`) or the official package from python.org. Tkinter is included by default.
+
 ---
 
 ## Installation Guide
@@ -78,6 +81,28 @@ Llama Server Manager is a complete Python-based graphical user interface (GUI) d
      ```bash
      python3 ~/.local/share/llama-manager/llama_manager.py
      ```
+
+---
+
+### macOS Installation
+
+1. **Locate Files**:
+   Ensure `llama_manager.py`, `install.py`, and `llama-manager.png` are in the same folder.
+
+2. **Run Installer**:
+   - Open your terminal.
+   - Navigate to the directory containing the files.
+   - Run the installer script:
+     ```bash
+     python3 install.py
+     ```
+
+3. **What happens next**:
+   - The script copies `llama_manager.py` to `~/Library/Application Support/llama-manager/`.
+   - It creates an application bundle at `~/Applications/Llama Server Manager.app`.
+
+4. **Launch**:
+   - Double-click **Llama Server Manager.app** in your `~/Applications` folder.
 
 ---
 

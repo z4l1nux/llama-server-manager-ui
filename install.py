@@ -148,9 +148,66 @@ def install_windows():
     print("\nLlama Server Manager installed successfully on Windows!")
     print("You can launch it from your Desktop or Start Menu.")
 
+def install_mac():
+    print("Installing Llama Server Manager on macOS...")
+    
+    # Define paths
+    home = Path.home()
+    install_dir = home / 'Library' / 'Application Support' / 'llama-manager'
+    bin_dest = install_dir / 'llama_manager.py'
+    app_dir = home / 'Applications' / 'Llama Server Manager.app'
+    macos_dir = app_dir / 'Contents' / 'MacOS'
+    launcher = macos_dir / 'Llama Server Manager'
+    
+    # 1. Locate source files
+    src_dir = Path(__file__).parent.resolve()
+    script_src = src_dir / 'llama_manager.py'
+    if not script_src.exists():
+        print(f"Error: Could not find llama_manager.py in {src_dir}")
+        sys.exit(1)
+        
+    icon_src = src_dir / 'llama-manager.png'
+    if not icon_src.exists():
+        potential_icon = home / '.local' / 'share' / 'icons' / 'llama-manager.png'
+        if potential_icon.exists():
+            icon_src = potential_icon
+
+    # 2. Create directories
+    install_dir.mkdir(parents=True, exist_ok=True)
+    macos_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 3. Copy files
+    if script_src.resolve() != bin_dest.resolve():
+        print(f"Copying script to {bin_dest}")
+        shutil.copy2(script_src, bin_dest)
+    else:
+        print("Script is already in the correct destination.")
+    bin_dest.chmod(0o755)
+
+    if icon_src.exists():
+        icon_dest = install_dir / 'icon.png'
+        if icon_src.resolve() != icon_dest.resolve():
+            print(f"Copying icon to {icon_dest}")
+            shutil.copy2(icon_src, icon_dest)
+            
+    # 4. Create launcher script inside Llama Server Manager.app
+    print(f"Creating macOS application bundle at {app_dir}")
+    launcher_content = f"""#!/bin/bash
+python3 "{bin_dest}" &
+exit 0
+"""
+    with open(launcher, 'w') as f:
+        f.write(launcher_content)
+    launcher.chmod(0o755)
+    
+    print("\nLlama Server Manager installed successfully on macOS!")
+    print("You can launch it from your ~/Applications folder.")
+
 def main():
     if IS_WINDOWS:
         install_windows()
+    elif sys.platform == 'darwin':
+        install_mac()
     else:
         install_linux()
 

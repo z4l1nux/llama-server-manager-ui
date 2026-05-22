@@ -386,6 +386,8 @@ class App:
                          f'Get-NetTCPConnection -LocalPort {port} -EA SilentlyContinue'
                          f' | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -EA SilentlyContinue }}'],
                         capture_output=True, timeout=5)
+                elif sys.platform == 'darwin':
+                    subprocess.run(f"kill -9 $(lsof -t -i:{port})", shell=True, capture_output=True)
                 else:
                     subprocess.run(['fuser', '-k', f'{port}/tcp'], capture_output=True)
             except Exception:
