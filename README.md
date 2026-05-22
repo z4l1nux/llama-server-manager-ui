@@ -10,6 +10,9 @@ Llama Server Manager is a complete Python-based graphical user interface (GUI) d
 *   **GUI Framework**: Tkinter (built-in for Python on Windows; usually needs a package install on Linux)
 *   **Dependencies**: Uses only standard library modules (no `pip install` required!).
 
+> [!TIP]
+> **Automatic llama.cpp Downloader**: You do not need to manually clone and compile `llama.cpp` anymore. The application has a built-in button next to the binary path config field to automatically fetch, download, and extract the latest compatible pre-compiled official binary for your operating system and CPU architecture.
+
 ### Prerequisites
 
 #### Windows

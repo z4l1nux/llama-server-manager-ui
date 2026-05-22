@@ -16,6 +16,10 @@ import time
 import socket
 import urllib.request
 import urllib.error
+import zipfile
+import tarfile
+import platform
+import tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -747,9 +751,11 @@ class ParametersTab:
         ttk.Label(g, text='Binário llama-server:').grid(row=0, column=0, sticky='w', padx=6, pady=3)
         bin_row = ttk.Frame(g)
         bin_row.grid(row=0, column=1, columnspan=2, sticky='w', padx=6)
-        ttk.Entry(bin_row, textvariable=self.bin_var, width=50).pack(side='left')
+        ttk.Entry(bin_row, textvariable=self.bin_var, width=44).pack(side='left')
         ttk.Button(bin_row, text='…', width=3,
                    command=lambda: self._pick(self.bin_var)).pack(side='left', padx=4)
+        ttk.Button(bin_row, text='⚡ Baixar llama.cpp', width=16,
+                   command=self.download_llama_cpp).pack(side='left', padx=4)
 
         self._row(g, 1, 'Host:', self.host_var, 20, 'Ex: 127.0.0.1  ou  0.0.0.0')
         self._row(g, 2, 'Porta:', self.port_var, 8, 'Padrão: 8080')
@@ -998,6 +1004,168 @@ class ParametersTab:
         save_config(c)
         self.app.tab_server._refresh_cmd()
         messagebox.showinfo('Salvo', 'Configurações salvas!')
+
+    def download_llama_cpp(self):
+        # Cria uma janela modal de progresso
+        dialog = tk.Toplevel(self.app.root)
+        dialog.title("Baixar llama.cpp")
+        dialog.geometry("450x180")
+        dialog.resizable(False, False)
+        dialog.transient(self.app.root)
+        dialog.grab_set()
+
+        # Centraliza a janela
+        dialog.update_idletasks()
+        w = dialog.winfo_width()
+        h = dialog.winfo_height()
+        x = self.app.root.winfo_x() + (self.app.root.winfo_width() - w) // 2
+        y = self.app.root.winfo_y() + (self.app.root.winfo_height() - h) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        # Elementos da interface do modal
+        lbl_status = ttk.Label(dialog, text="Buscando a versão mais recente no GitHub...", wraplength=400, justify='center')
+        lbl_status.pack(pady=20)
+
+        progress = ttk.Progressbar(dialog, orient='horizontal', length=350, mode='determinate')
+        progress.pack(pady=10)
+
+        btn_close = ttk.Button(dialog, text="Fechar", state='disabled', command=dialog.destroy)
+        btn_close.pack(pady=15)
+
+        def set_status(text):
+            dialog.after(0, lambda: lbl_status.config(text=text))
+            
+        def set_progress(value, pct=None, size_mb=None):
+            def update():
+                progress['value'] = value
+                if pct is not None and size_mb is not None:
+                    lbl_status.config(text=f"Baixando {asset_name}...\n{pct}% de {size_mb:.1f} MB")
+            dialog.after(0, update)
+
+        def run():
+            try:
+                # 1. Buscar a release mais recente no GitHub
+                url = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                
+                set_status("Conectando ao GitHub API...")
+                with urllib.request.urlopen(req) as response:
+                    release_data = json.loads(response.read().decode())
+                
+                tag_name = release_data.get('tag_name', 'latest')
+                assets = release_data.get('assets', [])
+                
+                # 2. Selecionar o asset correto para o OS/Arch atual
+                sys_platform = sys.platform
+                arch = platform.machine().lower()
+                
+                matched_asset = None
+                
+                if sys_platform == 'win32':
+                    # Windows x64
+                    for asset in assets:
+                        if 'win-cpu-x64.zip' in asset['name']:
+                            matched_asset = asset
+                            break
+                    if not matched_asset:
+                        # Fallback para qualquer win-cpu ou win-x64
+                        for asset in assets:
+                            if 'win' in asset['name'] and 'x64' in asset['name'] and 'cuda' not in asset['name']:
+                                matched_asset = asset
+                                break
+                elif sys_platform == 'darwin':
+                    # macOS
+                    is_arm = 'arm' in arch or 'aarch' in arch
+                    target_name = 'macos-arm64.tar.gz' if is_arm else 'macos-x64.tar.gz'
+                    for asset in assets:
+                        if target_name in asset['name']:
+                            matched_asset = asset
+                            break
+                else:
+                    # Linux / Outros
+                    is_arm = 'arm' in arch or 'aarch' in arch
+                    target_name = 'ubuntu-arm64.tar.gz' if is_arm else 'ubuntu-x64.tar.gz'
+                    for asset in assets:
+                        if target_name in asset['name']:
+                            matched_asset = asset
+                            break
+                            
+                if not matched_asset:
+                    set_status("Erro: Não foi possível encontrar um binário compatível para o seu sistema.")
+                    dialog.after(0, lambda: btn_close.config(state='normal'))
+                    return
+                
+                asset_name = matched_asset['name']
+                download_url = matched_asset['browser_download_url']
+                size_bytes = matched_asset.get('size', 0)
+                size_mb = size_bytes / (1024*1024)
+                
+                set_status(f"Baixando {asset_name} ({size_mb:.1f} MB)...")
+                
+                # 3. Baixar o arquivo
+                temp_dir = Path(tempfile.gettempdir())
+                download_path = temp_dir / asset_name
+                
+                # Reportar progresso de download
+                def report_hook(block_num, block_size, total_size):
+                    downloaded = block_num * block_size
+                    if total_size > 0:
+                        pct = min(100, int(downloaded * 100 / total_size))
+                        set_progress(pct, pct, size_mb)
+                
+                urllib.request.urlretrieve(download_url, download_path, reporthook=report_hook)
+                
+                # 4. Extrair arquivos
+                set_status("Extraindo arquivos...")
+                dialog.after(0, lambda: progress.config(mode='indeterminate'))
+                dialog.after(0, progress.start)
+                
+                bin_dir = CONFIG_DIR / 'bin'
+                bin_dir.mkdir(parents=True, exist_ok=True)
+                
+                if asset_name.endswith('.zip'):
+                    with zipfile.ZipFile(download_path, 'r') as zip_ref:
+                        zip_ref.extractall(bin_dir)
+                else:
+                    with tarfile.open(download_path, 'r:gz') as tar_ref:
+                        tar_ref.extractall(bin_dir)
+                
+                dialog.after(0, progress.stop)
+                dialog.after(0, lambda: progress.config(mode='determinate', value=100))
+                
+                # Encontrar o executável e configurar permissão
+                exe_name = 'llama-server.exe' if sys_platform == 'win32' else 'llama-server'
+                extracted_bin = bin_dir / exe_name
+                
+                # Caso os arquivos estejam dentro de uma subpasta após extrair
+                if not extracted_bin.exists():
+                    found_exes = list(bin_dir.glob(f"**/{exe_name}"))
+                    if found_exes:
+                        extracted_bin = found_exes[0]
+                
+                if extracted_bin.exists():
+                    if sys_platform != 'win32':
+                        extracted_bin.chmod(0o755)
+                    
+                    dialog.after(0, lambda: self.bin_var.set(str(extracted_bin.resolve())))
+                    set_status(f"Sucesso! Llama.cpp ({tag_name}) foi baixado e configurado com sucesso.")
+                    try:
+                        download_path.unlink()
+                    except Exception:
+                        pass
+                else:
+                    set_status("Erro: Binário 'llama-server' não foi localizado nos arquivos extraídos.")
+                
+            except urllib.error.URLError as e:
+                set_status(f"Erro de conexão: {e.reason}")
+            except Exception as e:
+                set_status(f"Ocorreu um erro: {str(e)}")
+            finally:
+                dialog.after(0, lambda: btn_close.config(state='normal'))
+                
+        # Iniciar thread em segundo plano
+        threading.Thread(target=run, daemon=True).start()
+
 
 
 # ─── Aba: Download ────────────────────────────────────────────────────────────
