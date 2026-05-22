@@ -150,22 +150,23 @@ def install_windows():
 
 def install_mac():
     print("Installing Llama Server Manager on macOS...")
-    
+
     # Define paths
-    home = Path.home()
-    install_dir = home / 'Library' / 'Application Support' / 'llama-manager'
-    bin_dest = install_dir / 'llama_manager.py'
-    app_dir = home / 'Applications' / 'Llama Server Manager.app'
-    macos_dir = app_dir / 'Contents' / 'MacOS'
-    launcher = macos_dir / 'Llama Server Manager'
-    
+    home         = Path.home()
+    install_dir  = home / 'Library' / 'Application Support' / 'llama-manager'
+    bin_dest     = install_dir / 'llama_manager.py'
+    app_dir      = home / 'Applications' / 'Llama Server Manager.app'
+    contents_dir = app_dir / 'Contents'
+    macos_dir    = contents_dir / 'MacOS'
+    launcher     = macos_dir / 'Llama Server Manager'
+
     # 1. Locate source files
-    src_dir = Path(__file__).parent.resolve()
+    src_dir    = Path(__file__).parent.resolve()
     script_src = src_dir / 'llama_manager.py'
     if not script_src.exists():
         print(f"Error: Could not find llama_manager.py in {src_dir}")
         sys.exit(1)
-        
+
     icon_src = src_dir / 'llama-manager.png'
     if not icon_src.exists():
         potential_icon = home / '.local' / 'share' / 'icons' / 'llama-manager.png'
@@ -175,7 +176,7 @@ def install_mac():
     # 2. Create directories
     install_dir.mkdir(parents=True, exist_ok=True)
     macos_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # 3. Copy files
     if script_src.resolve() != bin_dest.resolve():
         print(f"Copying script to {bin_dest}")
@@ -189,19 +190,50 @@ def install_mac():
         if icon_src.resolve() != icon_dest.resolve():
             print(f"Copying icon to {icon_dest}")
             shutil.copy2(icon_src, icon_dest)
-            
-    # 4. Create launcher script inside Llama Server Manager.app
+
+    # 4. Info.plist — required for Spotlight, Launchpad, and Gatekeeper
+    plist_path = contents_dir / 'Info.plist'
+    print(f"Creating Info.plist at {plist_path}")
+    plist_content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"'
+        ' "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0">\n'
+        '<dict>\n'
+        '    <key>CFBundleExecutable</key>\n'
+        '    <string>Llama Server Manager</string>\n'
+        '    <key>CFBundleIdentifier</key>\n'
+        '    <string>com.llama-manager.app</string>\n'
+        '    <key>CFBundleName</key>\n'
+        '    <string>Llama Server Manager</string>\n'
+        '    <key>CFBundleVersion</key>\n'
+        '    <string>1.0</string>\n'
+        '    <key>CFBundlePackageType</key>\n'
+        '    <string>APPL</string>\n'
+        '    <key>LSMinimumSystemVersion</key>\n'
+        '    <string>10.14</string>\n'
+        '    <key>NSHighResolutionCapable</key>\n'
+        '    <true/>\n'
+        '    <key>NSRequiresAquaSystemAppearance</key>\n'
+        '    <false/>\n'
+        '</dict>\n'
+        '</plist>\n'
+    )
+    with open(plist_path, 'w') as f:
+        f.write(plist_content)
+
+    # 5. Launcher with absolute Python path — avoids PATH lookup failure from Finder
+    python_exec = sys.executable
     print(f"Creating macOS application bundle at {app_dir}")
-    launcher_content = f"""#!/bin/bash
-python3 "{bin_dest}" &
-exit 0
-"""
+    print(f"Python interpreter: {python_exec}")
+    launcher_content = f'#!/bin/bash\nexec "{python_exec}" "{bin_dest}" "$@"\n'
     with open(launcher, 'w') as f:
         f.write(launcher_content)
     launcher.chmod(0o755)
-    
+
     print("\nLlama Server Manager installed successfully on macOS!")
-    print("You can launch it from your ~/Applications folder.")
+    print(f"Launch: ~/Applications/Llama Server Manager.app")
+    print(f"Or run: {python_exec} {bin_dest}")
 
 def main():
     if IS_WINDOWS:
