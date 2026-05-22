@@ -730,9 +730,12 @@ class ParametersTab:
         self._build_turbo_section()
         self._build_custom_section()
 
-        save_btn = ttk.Button(self.sf, text='💾  Salvar Configurações',
-                              command=self.save_all, style='Accent.TButton', width=28)
-        save_btn.pack(pady=12)
+        btn_row = ttk.Frame(self.sf)
+        btn_row.pack(pady=12)
+        ttk.Button(btn_row, text='↺  Recarregar do Disco',
+                   command=self.reload_from_disk).pack(side='left', padx=6)
+        ttk.Button(btn_row, text='💾  Salvar Configurações',
+                   command=self.save_all, style='Accent.TButton').pack(side='left', padx=6)
 
     # ── Seções ────────────────────────────────────────────────────────────────
 
@@ -980,6 +983,45 @@ class ParametersTab:
         p = filedialog.askopenfilename(filetypes=ft)
         if p:
             var.set(p)
+
+    def reload_from_disk(self):
+        self.app.config = load_config()
+        c = self.app.config
+        self.bin_var.set(c.get('llama_server_bin', LLAMA_BIN_DEFAULT))
+        self.host_var.set(c.get('host', '127.0.0.1'))
+        self.port_var.set(c.get('port', '8080'))
+        self.key_var.set(c.get('api_key', ''))
+        self.ctx_var.set(c.get('ctx_size', '4096'))
+        self.thr_var.set(c.get('threads', '-1'))
+        self.ngl_var.set(c.get('n_gpu_layers', '0'))
+        self.batch_var.set(c.get('batch_size', '2048'))
+        self.ubatch_var.set(c.get('ubatch_size', '512'))
+        self.par_var.set(c.get('parallel', '-1'))
+        self.np_var.set(c.get('n_predict', '-1'))
+        self.mmap_var.set(c.get('mmap', True))
+        self.mlock_var.set(c.get('mlock', False))
+        self.fa_var.set(c.get('flash_attn', 'auto'))
+        self.cb_var.set(c.get('cont_batching', True))
+        self.ctk_var.set(c.get('cache_type_k', 'f16'))
+        self.ctv_var.set(c.get('cache_type_v', 'f16'))
+        self.reasoning_var.set(c.get('reasoning', 'auto'))
+        self.reasoning_budget_var.set(c.get('reasoning_budget', '-1'))
+        self.spec_var.set(c.get('spec_enabled', False))
+        self.spec_model_var.set(c.get('spec_draft_model', ''))
+        self.spec_nmax_var.set(c.get('spec_draft_n_max', '5'))
+        self.spec_nmin_var.set(c.get('spec_draft_n_min', '0'))
+        self.spec_psplit_var.set(c.get('spec_draft_p_split', '0.10'))
+        self.spec_pmin_var.set(c.get('spec_draft_p_min', '0.00'))
+        self.turbo_var.set(c.get('turbo_enabled', False))
+        self.tq_rope_base_var.set(c.get('turbo_rope_freq_base', ''))
+        self.tq_rope_scale_var.set(c.get('turbo_rope_freq_scale', ''))
+        self.tq_rope_scaling_var.set(c.get('turbo_rope_scaling', 'linear'))
+        self.tq_extra_var.set(c.get('turbo_extra_args', ''))
+        self.custom_var.set(c.get('custom_args', ''))
+        self._toggle_spec()
+        self._toggle_turbo()
+        self.app.tab_server._refresh_cmd()
+        messagebox.showinfo('Recarregado', 'Configurações recarregadas do disco com sucesso.')
 
     def save_all(self):
         c = self.app.config
